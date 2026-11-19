@@ -62,6 +62,6 @@ If you want to compile it yourself, you just need **w64devkit** (MinGW-w64). Run
 
 I built this project with the help of AI to reverse-engineer and write the code, while I guided, structured, and tested everything in-game. (And yes, the comments in the source files are in Spanish).
 
-I consider this mod feature-complete and I won't be actively updating it, unless a future update breaks it. If you find any bugs or want to improve something, feel free to submit a **Pull Request**
+I've only tested this mod on my own Windows PC, so I'm not sure how it behaves on other operating systems (like Linux or Steam Deck). I consider this mod feature-complete and won't be actively updating it unless a future game/`xrevive` update breaks it, so if you run into any bugs, compatibility issues, or want to improve something, feel free to submit a **Pull Request**
 
-This project is open source under the MIT License. If you use this mod or feature it anywhere, please make sure to put me in the credits thanks
+This project is open source under the MIT License. If you use this mod or feature it anywhere, please make sure to put me in the credits
