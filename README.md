@@ -1,41 +1,65 @@
-# 50 Cent: Bulletproof - PC Mouse Mod (v1.0)
+# 50 Cent: Bulletproof - PC Mouse Mod
 **By Epii.J**
 
-A mouse mod for the recomp version of **50 Cent: Bulletproof**.
+A 1:1 mouse look mod for the PC recomp of **50 Cent: Bulletproof** running on **xrevive**.
 
-It aims to make camera control feel as native as possible on PC.
+It gives you raw PC mouse aiming and customizable controls.
 
 ---
 
 ## Features
-- Camera mouse control tweaked to feel as native as possible.
-- Fallback joystick emulation during execution scenes.
-- In-game config menu (`Shift + P`).
-- Configurable hostage camera vertical limits.
-- Custom mouse button binding for shooting, tactical moves, and extra buttons.
+
+- 1:1 mouse camera aiming (no deadzones or smoothing).
+- Jump fix (the camera won't jerk or snap when you jump or land).
+- Free vertical aiming while holding human shields.
+- Mouse camera control during execution scenes.
+- In-game settings menu (Shift + P).
+- Customizable mouse buttons (Left/Right click + extra mouse buttons).
+- Cursor automatically frees up in pause and main menus.
+
+---
+
+## Recommended In-Game Settings
+
+For the best feel, set these options in the game's pause menu:
+- **Fixed Camera:** OFF
+- **Invert X Axis:** OFF
+- **Invert Y Axis:** OFF
+- **Aim Assist:** OFF
+
+*(Leave the original game sensitivity alone; adjust sensitivity inside the mod menu instead).*
 
 ---
 
 ## Controls
-- **Shift + 0**: Toggle Mouse Mod ON / OFF.
-- **Shift + P**: Open / Close In-Game Config Menu.
-- **Mouse Sensitivity & Keys**: Fully customizable inside the `Shift + P` menu or via `mouse_mod.ini`.
+
+- **Shift + 0**: Turn mouse look ON / OFF (starts OFF by default).
+- **Shift + P**: Open / close the settings menu.
+- **+ / -**: Adjust sensitivity on the fly.
+- **Left Click**: Shoot (RT).
+- **Right Click**: Tactical Jump (Y).
+
+*(Everything can be remapped inside the Shift + P menu or in `mouse_mod.ini`).*
 
 ---
 
 ## Installation
-1. Copy `xinput1_4.dll` and `mouse_mod.ini` into your main game folder next to `50 Cent Bulletproof.exe`.
-2. Launch the game using `xrevive` (make sure mod loading / ReShade is enabled).
-3. Press `Shift + 0` in-game to enable the mouse.
+
+1. Download `xinput1_4.dll` from the Releases tab.
+2. Drop it into your game folder next to `50 Cent Bulletproof.exe`.
+3. Launch the game through `xrevive`.
+4. Press **Shift + 0** in-game to turn it on.
 
 ---
 
 ## Building
-Compiled locally using **w64devkit** (GCC / MinGW-w64).
+
+If you want to compile it yourself, you just need **w64devkit** (MinGW-w64). Run `compilar.bat` and it will generate `xinput1_4.dll`.
 
 ---
 
-## Code Disclaimer & Credits
-*Note: This code was 100% generated using AI (guided and tested by me), so it might not be perfectly structured or optimized.*
+## Notes & Credits
 
-This project is open source under the MIT License. Feel free to tweak it, fix it, or release your own version—just give me a quick shoutout if you use this as a base!
+I built this project with the help of AI to reverse-engineer and write the code, while I guided, structured, and tested everything in-game.
+
+This project is open source under the MIT License. If you use this mod as a base or feature it anywhere, a quick shoutout would be greatly appreciated!
