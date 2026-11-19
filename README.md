@@ -1,18 +1,18 @@
 # 50 Cent: Bulletproof - PC Mouse Mod (v1.0)
 **By Epii.J**
 
-A simple mouse mod for the recomp version of **50 Cent: Bulletproof**.
+A mouse mod for the recomp version of **50 Cent: Bulletproof**.
 
-It gives you direct mouse control over the camera instead of emulating console thumbstick.
+It aims to make camera control feel as native as possible on PC.
 
 ---
 
 ## Features
-- Smooth 1:1 camera mouse control.
+- Camera mouse control tweaked to feel as native as possible.
+- Fallback joystick emulation during execution scenes.
 - In-game config menu (`Shift + P`).
 - Configurable hostage camera vertical limits.
 - Custom mouse button binding for shooting, tactical moves, and extra buttons.
-- No deadzones, no joystick smoothing.
 
 ---
 
@@ -35,7 +35,7 @@ Compiled locally using **w64devkit** (GCC / MinGW-w64).
 
 ---
 
-## License & Credits
-Created by **Epii.J**.
+## Code Disclaimer & Credits
+*Note: This code was 100% generated using AI (guided and tested by me), so it might not be perfectly structured or optimized.*
 
-This project is open source under the MIT License. You are free to inspect, modify, and distribute this code or create derivative works, provided that credit is given to the original author (**Epii.J**) in any future releases or modifications.
+This project is open source under the MIT License. Feel free to tweak it, fix it, or release your own version—just give me a quick shoutout if you use this as a base!
