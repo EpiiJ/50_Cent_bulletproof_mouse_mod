@@ -1,9 +1,9 @@
 # 50 Cent: Bulletproof - PC Mouse Mod (v1.0)
 **By Epii.J**
 
-A simple mouse mod for the `xrevive` / `xrecomp` PC version of **50 Cent: Bulletproof**.
+A simple mouse mod for the recomp version of **50 Cent: Bulletproof**.
 
-It gives you direct mouse control over the camera instead of emulating a clunky console thumbstick.
+It gives you direct mouse control over the camera instead of emulating console thumbstick.
 
 ---
 
@@ -30,7 +30,12 @@ It gives you direct mouse control over the camera instead of emulating a clunky 
 
 ---
 
-## License & Credits
-Created by **Epii.J** - https://github.com/EpiiJ
+## Building
+Compiled locally using **w64devkit** (GCC / MinGW-w64).
 
-This project is open source. Feel free to modify it or create your own version! All I ask is that you give credit to the original mod author (**Epii.J**)
+---
+
+## License & Credits
+Created by **Epii.J**.
+
+This project is open source under the MIT License. You are free to inspect, modify, and distribute this code or create derivative works, provided that credit is given to the original author (**Epii.J**) in any future releases or modifications.
