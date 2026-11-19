@@ -39,7 +39,7 @@ For the best feel, set these options in the game's pause menu:
 - **Left Click**: Shoot (RT).
 - **Right Click**: Tactical Jump (Y).
 
-*(Everything can be remapped inside the Shift + P menu or in `mouse_mod.ini`).*
+*(Everything can be remapped inside the Shift + P menu 
 
 ---
 
