@@ -60,6 +60,8 @@ If you want to compile it yourself, you just need **w64devkit** (MinGW-w64). Run
 
 ## Notes & Credits
 
-I built this project with the help of AI to reverse-engineer and write the code, while I guided, structured, and tested everything in-game.
+I built this project with the help of AI to reverse-engineer and write the code, while I guided, structured, and tested everything in-game. (And yes, the comments in the source files are in Spanish).
 
-This project is open source under the MIT License. If you use this mod as a base or feature it anywhere, a quick shoutout would be greatly appreciated!
+I consider this mod feature-complete and I won't be actively updating it, unless a future update breaks it. If you find any bugs or want to improve something, feel free to submit a **Pull Request**!
+
+This project is open source under the MIT License. If you use this mod or feature it anywhere, please make sure to put me in the credits thanks
