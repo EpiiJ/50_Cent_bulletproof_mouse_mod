@@ -51,16 +51,14 @@ static char g_iniPath[MAX_PATH] = {0};
 static char g_logPath[MAX_PATH] = {0};
 
 // Estado interno de camara y cursor
-static ULONGLONG     g_lastCamTick         = 0;
-static ULONGLONG     g_lastMode0Tick       = 0;
-static bool          g_cursorHidden        = false;
-static volatile bool g_inActiveGame        = false;
-static LONG          g_threadCreated       = 0;
-static int32_t       g_lastCamMode         = -999;
-static float         g_savedMode0Pitch     = 0.0f;
-static bool          g_justReturnedToMode0 = false;
-static int           g_camMoveLogCount     = 0;
-static bool          g_camHookAliveLogged  = false;
+static ULONGLONG g_lastCamTick         = 0;
+static bool      g_cursorHidden        = false;
+static LONG      g_threadCreated       = 0;
+static int32_t   g_lastCamMode         = -999;
+static float     g_savedMode0Pitch     = 0.0f;
+static bool      g_justReturnedToMode0 = false;
+static int       g_camMoveLogCount     = 0;
+static bool      g_camHookAliveLogged  = false;
 
 // ============================================================================
 // PROXY REAL A System32\xinput1_4.dll (No rompe mandos fisicos / Steam Deck)
@@ -368,7 +366,6 @@ static void LoadOrCreateConfig()
     GetPrivateProfileStringA("Mouse", "SensitivityY", "1.00", buf, sizeof(buf), g_iniPath);
     float sy = (float)atof(buf);
 
-    // Migracion automatica si venia un .ini viejo en escala cruda (ej. 0.0022)
     if (sx > 0.0f && sx < 0.05f) sx = sx / BASE_SENS_RAD_PER_PX;
     if (sy > 0.0f && sy < 0.05f) sy = sy / BASE_SENS_RAD_PER_PX;
     if (sx < 0.01f) sx = 1.00f;
@@ -544,8 +541,6 @@ static uintptr_t FindCallToFunction(uintptr_t targetFunc)
     return 0;
 }
 
-// Plan B para localizar FUN_input si alguna futura version cambia wasdMask:
-// busca una funcion con 4 escrituras de 0x8001 (-32767) y 0x7FFF (+32767) + 0xFF en offsets +2..+9
 static uintptr_t FindInputMarkerPlanB(RtlLookupFunctionEntry_t fnRtlLookup)
 {
     uint8_t *text = (uint8_t *)g_textStart;
@@ -575,7 +570,6 @@ static uintptr_t FindInputMarkerPlanB(RtlLookupFunctionEntry_t fnRtlLookup)
                         size_t fnLen = funcEnd - funcStart;
                         for (size_t k = 0; k + 4 <= fnLen; k++)
                         {
-                            // MOV byte ptr [reg + disp8], 0xFF -> C6 4x disp8 FF (disp8 en 2..9)
                             if (fn[k] == 0xC6 && (fn[k + 1] & 0xF8) == 0x40 &&
                                 fn[k + 2] >= 2 && fn[k + 2] <= 9 && fn[k + 3] == 0xFF)
                             {
@@ -919,16 +913,15 @@ static bool ApplyXboxAction(uint8_t *param_1, int action)
 }
 
 // ---------------------------------------------------------------------------
-// HOOK 1: Mando (Firma exacta 4 params + retorno, bloqueo GUI, cursor auto en menus)
+// HOOK 1: Mando (Lectura constante de clics y dual-wield en Arsenal)
 // ---------------------------------------------------------------------------
 static uint64_t Hooked_Input(uint8_t *param_1, uint64_t param_2, uint64_t param_3, uint8_t param_4)
 {
-    // Mientras la GUI esta abierta, bloquear todo input hacia el juego (mismo PID)
+    // Mientras la GUI este abierta, bloquear input hacia el juego (mismo PID)
     if (g_guiOpen)
     {
         UpdateCursorVisibility(false);
-        g_lastCamTick  = 0;
-        g_inActiveGame = false;
+        g_lastCamTick = 0;
         if (param_1) memset(param_1, 0, 18);
         return 0;
     }
@@ -943,15 +936,14 @@ static uint64_t Hooked_Input(uint8_t *param_1, uint64_t param_2, uint64_t param_
     if (!g_mouseEnabled || !isFocused)
     {
         UpdateCursorVisibility(false);
-        g_lastCamTick  = 0;
-        g_inActiveGame = false;
+        g_lastCamTick = 0;
         return ret;
     }
 
-    ULONGLONG now = GetTickCount64();
-    bool inActiveGameplay = false;
-    int32_t camMode = -1;
+    UpdateCursorVisibility(true);
 
+    // Leer modo de camara actual si la memoria de Xbox esta lista
+    int32_t camMode = -1;
     uint64_t lVar = *(uint64_t *)ADDR_XBOX_RAM_BASE_PTR;
     if (lVar != 0)
     {
@@ -972,35 +964,16 @@ static uint64_t Hooked_Input(uint8_t *param_1, uint64_t param_2, uint64_t param_
                     }
                     g_lastCamMode = camMode;
                 }
-
-                // Detectar si estamos en gameplay activo o en Menu Principal / Pausa / Carga
-                if (camMode == 0)
-                {
-                    inActiveGameplay = (g_lastMode0Tick != 0 && (now - g_lastMode0Tick <= 250));
-                }
-                else if (g_lastMode0Tick != 0 && (camMode == 3 || camMode == 4 || camMode == 5 || camMode == 7))
-                {
-                    inActiveGameplay = true;
-                }
             }
         }
     }
 
-    g_inActiveGame = inActiveGameplay;
-
-    // Si estamos en Menu Principal / Pausa / Carga: liberar cursor automaticamente
-    if (!inActiveGameplay)
+    // En Modo 0 (gameplay o arsenal), stick derecho a 0 para que no interfiera
+    if (camMode == 0)
     {
-        UpdateCursorVisibility(false);
-        g_lastCamTick = 0;
-        return ret;
+        *(int16_t *)(param_1 + 0x0E) = 0;
+        *(int16_t *)(param_1 + 0x10) = 0;
     }
-
-    UpdateCursorVisibility(true);
-
-    // En Modo 0 forzar stick derecho a 0 (control 100% nativo en RAM)
-    *(int16_t *)(param_1 + 0x0E) = 0;
-    *(int16_t *)(param_1 + 0x10) = 0;
 
     bool injected = false;
 
@@ -1037,7 +1010,8 @@ static uint64_t Hooked_Input(uint8_t *param_1, uint64_t param_2, uint64_t param_
         }
     }
 
-    // Binds de botones del mouse (Left, Right + botones extra dinamicos)
+    // BINDS DE BOTONES DEL MOUSE (Left Click -> RT, Right Click -> Y, etc.)
+    // SIEMPRE ACTIVOS: funciona en combate y en el arsenal para equipar dual-wield con clic derecho
     if (GetAsyncKeyState(VK_LBUTTON) & 0x8000)
     {
         if (ApplyXboxAction(param_1, g_cfg.leftClickAction)) injected = true;
@@ -1063,8 +1037,6 @@ static uint64_t Hooked_Input(uint8_t *param_1, uint64_t param_2, uint64_t param_
 // ---------------------------------------------------------------------------
 static void Hooked_Camera(void)
 {
-    g_lastMode0Tick = GetTickCount64();
-
     uint64_t lVar    = *(uint64_t *)ADDR_XBOX_RAM_BASE_PTR;
     uint32_t thisPtr = *(uint32_t *)ADDR_REG_ECX_THIS;
     uint32_t esp     = *(uint32_t *)ADDR_REG_ESP;
@@ -1288,7 +1260,6 @@ static DWORD WINAPI ModInitThread(LPVOID lpParam)
         Mod_WriteLog("[FATAL] No se pudieron resolver las direcciones universales.\n");
     }
 
-    // Arrancar hilo de la GUI (la ventana nace oculta hasta apretar el shortcut)
     Gui_StartThread();
 
     return 0;
@@ -1313,12 +1284,10 @@ DWORD WINAPI XInputGetState(DWORD dwUserIndex, void *pState)
     {
         if (g_guiOpen)
         {
-            // Bloquear mando fisico mientras la GUI esta abierta
             memset((uint8_t *)pState + 4, 0, 12);
         }
-        else if (g_mouseEnabled && g_inActiveGame && g_lastCamMode == 0)
+        else if (g_mouseEnabled && g_lastCamMode == 0)
         {
-            // Evitar drift del stick derecho de un mando conectado en Modo 0
             *(int16_t *)((uint8_t *)pState + 12) = 0; // sThumbRX
             *(int16_t *)((uint8_t *)pState + 14) = 0; // sThumbRY
         }
