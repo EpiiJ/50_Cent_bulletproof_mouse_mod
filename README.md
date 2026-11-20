@@ -16,7 +16,7 @@ It gives you raw PC mouse aiming and customizable controls.
 - Mouse camera control during execution scenes.
 - In-game settings menu (Shift + P).
 - Customizable mouse buttons (Left/Right click + extra mouse buttons).
-- Cursor automatically frees up in pause and main menus.
+- Walk key with configurable speed.
 
 ---
 
