@@ -50,7 +50,6 @@ For the best feel, set these options in the game's pause menu:
 1. Download `xinput1_4.dll` from the Releases tab.
 2. Drop it into your game folder next to `50 Cent Bulletproof.exe`.
 3. Launch the game through `xrevive`.
-4. Press **Shift + 0** in-game to turn it on.
 
 ---
 
