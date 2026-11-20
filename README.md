@@ -1,3 +1,4 @@
+
 # 50 Cent: Bulletproof - PC Mouse Mod
 **By Epii.J**
 
@@ -20,7 +21,7 @@ It gives you raw PC mouse aiming and customizable controls.
 ---
 
 ## Recommended In-Game Settings
-
+<img width="455" height="653" alt="Untitled-1" src="https://github.com/user-attachments/assets/2613a916-a791-425c-9e0b-7f541121d8af" />
 For the best feel, set these options in the game's pause menu:
 - **Fixed Camera:** OFF
 - **Invert X Axis:** OFF
