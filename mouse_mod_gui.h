@@ -52,7 +52,8 @@ struct ModConfig
     int   execCamOrbit;
     int   removeHostageLimit;
     int   debugLog;
-
+    float walkSpeed;
+	
     int   leftClickAction;      // Default: XACT_RT (Disparar)
     int   rightClickAction;     // Default: XACT_Y (Salto tactico)
 
@@ -63,6 +64,7 @@ struct ModConfig
     ShortcutDef keyToggleMod;   // Default: Shift + 0
     ShortcutDef keySensUp;      // Default: +
     ShortcutDef keySensDown;    // Default: -
+	ShortcutDef keyWalk; 
 };
 
 // Estado compartido entre el motor y la GUI
