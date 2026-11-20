@@ -52,6 +52,7 @@ static char g_logPath[MAX_PATH] = {0};
 
 // Estado interno de camara y cursor
 static ULONGLONG g_lastCamTick         = 0;
+static ULONGLONG g_lastCamFrameTick    = 0;
 static bool      g_cursorHidden        = false;
 static LONG      g_threadCreated       = 0;
 static int32_t   g_lastCamMode         = -999;
@@ -238,7 +239,6 @@ bool IsShortcutHeldNow(const ShortcutDef &sc)
 
     if ((GetAsyncKeyState(sc.vk) & 0x8000) != 0) return true;
 
-    // Equivalencias comodas para teclado numerico
     if (sc.vk == '0' && (GetAsyncKeyState(VK_NUMPAD0) & 0x8000)) return true;
     if (sc.vk == VK_OEM_PLUS && (GetAsyncKeyState(VK_ADD) & 0x8000)) return true;
     if (sc.vk == VK_OEM_MINUS && (GetAsyncKeyState(VK_SUBTRACT) & 0x8000)) return true;
@@ -258,6 +258,7 @@ void Mod_ResetDefaults(void)
     g_cfg.execCamOrbit       = 1;
     g_cfg.removeHostageLimit = 1;
     g_cfg.debugLog           = 0;
+    g_cfg.walkSpeed          = 0.56f;
 
     g_cfg.leftClickAction    = XACT_RT;
     g_cfg.rightClickAction   = XACT_Y;
@@ -268,6 +269,7 @@ void Mod_ResetDefaults(void)
     g_cfg.keyToggleMod = { '0', true, false, false };           // Shift + 0
     g_cfg.keySensUp    = { VK_OEM_PLUS, false, false, false };  // +
     g_cfg.keySensDown  = { VK_OEM_MINUS, false, false, false }; // -
+    g_cfg.keyWalk      = { 'Z', false, false, false };          // Z
 }
 
 static void SaveShortcutIni(const char *prefix, const ShortcutDef &sc)
@@ -312,6 +314,9 @@ void Mod_SaveConfig(void)
     WritePrivateProfileStringA("Mouse", "RemoveHostagePitchLimit", g_cfg.removeHostageLimit ? "1" : "0", g_iniPath);
     WritePrivateProfileStringA("Mouse", "ExecCamOrbit", g_cfg.execCamOrbit ? "1" : "0", g_iniPath);
 
+    snprintf(buf, sizeof(buf), "%.2f", g_cfg.walkSpeed);
+    WritePrivateProfileStringA("Mouse", "WalkSpeed", buf, g_iniPath);
+
     snprintf(buf, sizeof(buf), "%d", g_cfg.leftClickAction);
     WritePrivateProfileStringA("Binds", "LeftClickAction", buf, g_iniPath);
     snprintf(buf, sizeof(buf), "%d", g_cfg.rightClickAction);
@@ -342,6 +347,7 @@ void Mod_SaveConfig(void)
     SaveShortcutIni("ToggleMod", g_cfg.keyToggleMod);
     SaveShortcutIni("SensUp",    g_cfg.keySensUp);
     SaveShortcutIni("SensDown",  g_cfg.keySensDown);
+    SaveShortcutIni("Walk",      g_cfg.keyWalk);
 
     WritePrivateProfileStringA("Misc", "DebugLog", g_cfg.debugLog ? "1" : "0", g_iniPath);
 }
@@ -380,6 +386,12 @@ static void LoadOrCreateConfig()
     g_cfg.removeHostageLimit = GetPrivateProfileIntA("Mouse", "RemoveHostagePitchLimit", 1, g_iniPath);
     g_cfg.execCamOrbit       = GetPrivateProfileIntA("Mouse", "ExecCamOrbit", 1, g_iniPath);
 
+    GetPrivateProfileStringA("Mouse", "WalkSpeed", "0.56", buf, sizeof(buf), g_iniPath);
+    float wspd = (float)atof(buf);
+    if (wspd < 0.34f) wspd = 0.34f;
+    if (wspd > 1.00f) wspd = 1.00f;
+    g_cfg.walkSpeed = wspd;
+
     g_cfg.leftClickAction  = GetPrivateProfileIntA("Binds", "LeftClickAction", XACT_RT, g_iniPath);
     g_cfg.rightClickAction = GetPrivateProfileIntA("Binds", "RightClickAction", XACT_Y, g_iniPath);
     if (g_cfg.leftClickAction < 0 || g_cfg.leftClickAction >= XACT_COUNT) g_cfg.leftClickAction = XACT_RT;
@@ -408,6 +420,7 @@ static void LoadOrCreateConfig()
     LoadShortcutIni("ToggleMod", &g_cfg.keyToggleMod);
     LoadShortcutIni("SensUp",    &g_cfg.keySensUp);
     LoadShortcutIni("SensDown",  &g_cfg.keySensDown);
+    LoadShortcutIni("Walk",      &g_cfg.keyWalk);
 
     g_cfg.debugLog = GetPrivateProfileIntA("Misc", "DebugLog", 0, g_iniPath);
 }
@@ -913,7 +926,7 @@ static bool ApplyXboxAction(uint8_t *param_1, int action)
 }
 
 // ---------------------------------------------------------------------------
-// HOOK 1: Mando (Lectura constante de clics y dual-wield en Arsenal)
+// HOOK 1: Mando (Lectura constante de clics y caminata lenta con Alt)
 // ---------------------------------------------------------------------------
 static uint64_t Hooked_Input(uint8_t *param_1, uint64_t param_2, uint64_t param_3, uint8_t param_4)
 {
@@ -973,6 +986,18 @@ static uint64_t Hooked_Input(uint8_t *param_1, uint64_t param_2, uint64_t param_
     {
         *(int16_t *)(param_1 + 0x0E) = 0;
         *(int16_t *)(param_1 + 0x10) = 0;
+    }
+
+    // CAMINATA LENTA (Walk Key):
+    // Solo se aplica si la camara 3D esta activa en tiempo real (GetTickCount64() - g_lastCamFrameTick <= 120).
+    // Si la camara esta pausada (por ejemplo en el arsenal o ruleta de armas), deja WASD al 100% para que nunca se trabe!
+    bool in3dGameplay = (g_lastCamFrameTick != 0 && (GetTickCount64() - g_lastCamFrameTick <= 120));
+    if (camMode == 0 && in3dGameplay && IsShortcutHeldNow(g_cfg.keyWalk))
+    {
+        int16_t *pLX = (int16_t *)(param_1 + 0x0A);
+        int16_t *pLY = (int16_t *)(param_1 + 0x0C);
+        *pLX = (int16_t)((float)*pLX * g_cfg.walkSpeed);
+        *pLY = (int16_t)((float)*pLY * g_cfg.walkSpeed);
     }
 
     bool injected = false;
@@ -1037,6 +1062,8 @@ static uint64_t Hooked_Input(uint8_t *param_1, uint64_t param_2, uint64_t param_
 // ---------------------------------------------------------------------------
 static void Hooked_Camera(void)
 {
+    g_lastCamFrameTick = GetTickCount64();
+
     uint64_t lVar    = *(uint64_t *)ADDR_XBOX_RAM_BASE_PTR;
     uint32_t thisPtr = *(uint32_t *)ADDR_REG_ECX_THIS;
     uint32_t esp     = *(uint32_t *)ADDR_REG_ESP;
