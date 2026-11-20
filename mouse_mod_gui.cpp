@@ -28,10 +28,12 @@ enum ControlIds
     IDC_TAB_CONFIG = 1001,
     IDC_TAB_ABOUT  = 1002,
 
-    IDC_SLIDER_SENS_X = 1101,
-    IDC_EDIT_SENS_X   = 1102,
-    IDC_SLIDER_SENS_Y = 1103,
-    IDC_EDIT_SENS_Y   = 1104,
+    IDC_SLIDER_SENS_X   = 1101,
+    IDC_EDIT_SENS_X     = 1102,
+    IDC_SLIDER_SENS_Y   = 1103,
+    IDC_EDIT_SENS_Y     = 1104,
+    IDC_SLIDER_WALK_SPD = 1105,
+    IDC_EDIT_WALK_SPD   = 1106,
 
     IDC_CHK_INVERT_X    = 1201,
     IDC_CHK_INVERT_Y    = 1202,
@@ -49,6 +51,7 @@ enum ControlIds
     IDC_BTN_KEY_TOGGLE  = 1402,
     IDC_BTN_KEY_SENS_UP = 1403,
     IDC_BTN_KEY_SENS_DN = 1404,
+    IDC_BTN_KEY_WALK    = 1405,
 
     IDC_BTN_RESET       = 1501,
 
@@ -66,18 +69,19 @@ static HFONT  g_fontSm   = NULL;
 
 static int  g_activeTab          = 0;  // 0 = Config, 1 = About
 static bool g_updatingUi         = false;
-static int  g_captureShortcutIdx = -1; // 0=Menu, 1=Toggle, 2=SensUp, 3=SensDown
+static int  g_captureShortcutIdx = -1; // 0=Menu, 1=Toggle, 2=SensUp, 3=SensDown, 4=Walk
 static bool g_capturingMouseBtn  = false;
 static HWND g_prevGameHwnd       = NULL;
 
 // Handles de controles
 static HWND hTabConfig, hTabAbout;
 static HWND hSliderX, hEditX, hSliderY, hEditY;
+static HWND hSliderWalk, hEditWalk;
 static HWND hChkInvX, hChkInvY, hChkExec, hChkHostage, hChkLog;
 static HWND hBtnAddBind, hCmbLeft, hCmbRight;
 static HWND hCmbExtra[MAX_EXTRA_MOUSE_BINDS];
 static HWND hBtnDelExtra[MAX_EXTRA_MOUSE_BINDS];
-static HWND hBtnKeyMenu, hBtnKeyToggle, hBtnKeyUp, hBtnKeyDown;
+static HWND hBtnKeyMenu, hBtnKeyToggle, hBtnKeyUp, hBtnKeyDown, hBtnKeyWalk;
 static HWND hBtnReset;
 static HWND hBtnGitHub;
 
@@ -99,7 +103,6 @@ static void EnableDarkTitleBar(HWND hwnd)
     if (fn)
     {
         BOOL dark = TRUE;
-        // 20 = DWMWA_USE_IMMERSIVE_DARK_MODE (Win10 2004+ / Win11), 19 = Win10 1903/1909
         if (FAILED(fn(hwnd, 20, &dark, sizeof(dark))))
         {
             fn(hwnd, 19, &dark, sizeof(dark));
@@ -142,6 +145,9 @@ static void RefreshShortcutButtons()
 
     if (g_captureShortcutIdx == 3) SetWindowTextA(hBtnKeyDown, "Press key...");
     else { FormatShortcutText(g_cfg.keySensDown, buf, sizeof(buf)); SetWindowTextA(hBtnKeyDown, buf); }
+
+    if (g_captureShortcutIdx == 4) SetWindowTextA(hBtnKeyWalk, "Press key...");
+    else { FormatShortcutText(g_cfg.keyWalk, buf, sizeof(buf)); SetWindowTextA(hBtnKeyWalk, buf); }
 }
 
 static void RefreshExtraBindControls()
@@ -179,6 +185,13 @@ static void SyncUiFromConfig()
     SetWindowTextA(hEditY, buf);
     SendMessageA(hSliderY, TBM_SETPOS, TRUE, ClampSliderPos(g_cfg.sensY));
 
+    snprintf(buf, sizeof(buf), "%.2f", g_cfg.walkSpeed);
+    SetWindowTextA(hEditWalk, buf);
+    int wPos = (int)(g_cfg.walkSpeed * 100.0f + 0.5f);
+    if (wPos < 34)  wPos = 34;
+    if (wPos > 100) wPos = 100;
+    SendMessageA(hSliderWalk, TBM_SETPOS, TRUE, wPos);
+
     SendMessageA(hCmbLeft,  CB_SETCURSEL, (WPARAM)g_cfg.leftClickAction, 0);
     SendMessageA(hCmbRight, CB_SETCURSEL, (WPARAM)g_cfg.rightClickAction, 0);
 
@@ -199,6 +212,9 @@ static void UpdateTabVisibility()
     ShowWindow(hSliderY, showCfg);
     ShowWindow(hEditY, showCfg);
 
+    ShowWindow(hSliderWalk, showCfg);
+    ShowWindow(hEditWalk, showCfg);
+
     ShowWindow(hChkInvX, showCfg);
     ShowWindow(hChkInvY, showCfg);
     ShowWindow(hChkExec, showCfg);
@@ -213,6 +229,7 @@ static void UpdateTabVisibility()
     ShowWindow(hBtnKeyToggle, showCfg);
     ShowWindow(hBtnKeyUp, showCfg);
     ShowWindow(hBtnKeyDown, showCfg);
+    ShowWindow(hBtnKeyWalk, showCfg);
     ShowWindow(hBtnReset, showCfg);
 
     RefreshExtraBindControls();
@@ -375,6 +392,7 @@ static void DrawOwnerButton(DRAWITEMSTRUCT *dis)
         (id == IDC_BTN_KEY_TOGGLE  && g_captureShortcutIdx == 1) ||
         (id == IDC_BTN_KEY_SENS_UP && g_captureShortcutIdx == 2) ||
         (id == IDC_BTN_KEY_SENS_DN && g_captureShortcutIdx == 3) ||
+        (id == IDC_BTN_KEY_WALK    && g_captureShortcutIdx == 4) ||
         (id == IDC_BTN_ADD_BIND    && g_capturingMouseBtn);
 
     COLORREF bgCol = COL_BTN_BG;
@@ -500,11 +518,16 @@ static void DrawMainWindowPaint(HWND hwnd)
         RECT rK4 = { 228, 440, 314, 464 };
         DrawTextA(hdc, "Sens Down:", -1, &rK4, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
 
+        RECT rK5 = { 16, 470, 102, 494 };
+        DrawTextA(hdc, "Walk Key:", -1, &rK5, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+        RECT rK6 = { 228, 470, 314, 494 };
+        DrawTextA(hdc, "Walk Speed:", -1, &rK6, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+
         // Separador 4
-        MoveToEx(hdc, 16, 472, NULL); LineTo(hdc, 438, 472);
+        MoveToEx(hdc, 16, 500, NULL); LineTo(hdc, 438, 500);
 
         // Recuadro Recommended In-Game Config
-        RECT boxRec = { 16, 514, 438, 582 };
+        RECT boxRec = { 16, 542, 438, 610 };
         FillRect(hdc, &boxRec, g_brCtrlBg);
         HGDIOBJ oldBr = SelectObject(hdc, GetStockObject(NULL_BRUSH));
         Rectangle(hdc, boxRec.left, boxRec.top, boxRec.right, boxRec.bottom);
@@ -512,16 +535,16 @@ static void DrawMainWindowPaint(HWND hwnd)
 
         SelectObject(hdc, g_fontBold);
         SetTextColor(hdc, COL_TEXT);
-        RECT rRecT = { 26, 520, 430, 536 };
+        RECT rRecT = { 26, 548, 430, 564 };
         DrawTextA(hdc, "Recommended In-Game Config:", -1, &rRecT, DT_LEFT | DT_SINGLELINE);
 
         SelectObject(hdc, g_fontSm);
         SetTextColor(hdc, COL_TEXT_DIM);
-        RECT rRec1 = { 26, 537, 430, 552 };
+        RECT rRec1 = { 26, 565, 430, 580 };
         DrawTextA(hdc, "Fixed Camera: OFF    |    Invert X Axis: OFF", -1, &rRec1, DT_LEFT | DT_SINGLELINE);
-        RECT rRec2 = { 26, 552, 430, 567 };
+        RECT rRec2 = { 26, 580, 430, 595 };
         DrawTextA(hdc, "Invert Y Axis: OFF    |    Aim Assist: OFF", -1, &rRec2, DT_LEFT | DT_SINGLELINE);
-        RECT rRec3 = { 26, 567, 430, 580 };
+        RECT rRec3 = { 26, 595, 430, 608 };
         DrawTextA(hdc, "(Do not change in-game sensitivity settings)", -1, &rRec3, DT_LEFT | DT_SINGLELINE);
 
         SelectObject(hdc, oldPen);
@@ -704,11 +727,20 @@ static void CreateGuiControls(HWND hwnd)
     hBtnKeyDown   = CreateWindowA("BUTTON", "", WS_CHILD | WS_VISIBLE | BS_OWNERDRAW,
                                   316, 440, 122, 24, hwnd, (HMENU)(INT_PTR)IDC_BTN_KEY_SENS_DN, hInst, NULL);
 
+    // Fila Walk: Boton de tecla a la izquierda, Slider y Edit a la derecha
+    hBtnKeyWalk   = CreateWindowA("BUTTON", "", WS_CHILD | WS_VISIBLE | BS_OWNERDRAW,
+                                  104, 470, 114, 24, hwnd, (HMENU)(INT_PTR)IDC_BTN_KEY_WALK, hInst, NULL);
+    hSliderWalk   = CreateWindowA(TRACKBAR_CLASSA, "", WS_CHILD | WS_VISIBLE | TBS_HORZ | TBS_NOTICKS,
+                                  306, 468, 80, 26, hwnd, (HMENU)(INT_PTR)IDC_SLIDER_WALK_SPD, hInst, NULL);
+    SendMessageA(hSliderWalk, TBM_SETRANGE, TRUE, MAKELONG(34, 100));
+    hEditWalk     = CreateWindowA("EDIT", "0.56", WS_CHILD | WS_VISIBLE | WS_BORDER | ES_CENTER | ES_AUTOHSCROLL,
+                                  392, 470, 46, 22, hwnd, (HMENU)(INT_PTR)IDC_EDIT_WALK_SPD, hInst, NULL);
+
     // Fila inferior: DebugLog a la izquierda, Reset to Default a la derecha
     hChkLog   = CreateWindowA("BUTTON", "Debug Log (mod_log.txt)", WS_CHILD | WS_VISIBLE | BS_OWNERDRAW,
-                              16, 482, 210, 22, hwnd, (HMENU)(INT_PTR)IDC_CHK_DEBUG_LOG, hInst, NULL);
+                              16, 510, 210, 22, hwnd, (HMENU)(INT_PTR)IDC_CHK_DEBUG_LOG, hInst, NULL);
     hBtnReset = CreateWindowA("BUTTON", "Reset to Default", WS_CHILD | WS_VISIBLE | BS_OWNERDRAW,
-                              306, 480, 132, 26, hwnd, (HMENU)(INT_PTR)IDC_BTN_RESET, hInst, NULL);
+                              306, 508, 132, 26, hwnd, (HMENU)(INT_PTR)IDC_BTN_RESET, hInst, NULL);
 
     // Boton GitHub en pestana About
     hBtnGitHub = CreateWindowA("BUTTON", "GitHub", WS_CHILD | BS_OWNERDRAW,
@@ -717,6 +749,7 @@ static void CreateGuiControls(HWND hwnd)
     // Fuentes en controles nativos
     SendMessageA(hEditX,    WM_SETFONT, (WPARAM)g_fontNorm, TRUE);
     SendMessageA(hEditY,    WM_SETFONT, (WPARAM)g_fontNorm, TRUE);
+    SendMessageA(hEditWalk, WM_SETFONT, (WPARAM)g_fontNorm, TRUE);
     SendMessageA(hCmbLeft,  WM_SETFONT, (WPARAM)g_fontNorm, TRUE);
     SendMessageA(hCmbRight, WM_SETFONT, (WPARAM)g_fontNorm, TRUE);
     for (int i = 0; i < MAX_EXTRA_MOUSE_BINDS; i++)
@@ -765,23 +798,30 @@ static LRESULT CALLBACK GuiWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
         case WM_HSCROLL:
         {
             HWND hCtrl = (HWND)lParam;
-            if (!g_updatingUi && (hCtrl == hSliderX || hCtrl == hSliderY))
+            if (!g_updatingUi && (hCtrl == hSliderX || hCtrl == hSliderY || hCtrl == hSliderWalk))
             {
                 int pos = (int)SendMessageA(hCtrl, TBM_GETPOS, 0, 0);
                 float val = (float)pos / 100.0f;
                 char buf[32];
-                FormatSensText(val, buf, sizeof(buf));
 
                 g_updatingUi = true;
                 if (hCtrl == hSliderX)
                 {
+                    FormatSensText(val, buf, sizeof(buf));
                     g_cfg.sensX = val;
                     SetWindowTextA(hEditX, buf);
                 }
-                else
+                else if (hCtrl == hSliderY)
                 {
+                    FormatSensText(val, buf, sizeof(buf));
                     g_cfg.sensY = val;
                     SetWindowTextA(hEditY, buf);
+                }
+                else if (hCtrl == hSliderWalk)
+                {
+                    g_cfg.walkSpeed = val;
+                    snprintf(buf, sizeof(buf), "%.2f", val);
+                    SetWindowTextA(hEditWalk, buf);
                 }
                 g_updatingUi = false;
             }
@@ -815,6 +855,37 @@ static LRESULT CALLBACK GuiWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
                         FormatSensText(g_cfg.sensY, buf, sizeof(buf));
                         SetWindowTextA(hEditY, buf);
                     }
+                    g_updatingUi = false;
+                }
+                return 0;
+            }
+
+            // Edicion manual de Walk Speed
+            if (id == IDC_EDIT_WALK_SPD)
+            {
+                if (code == EN_CHANGE && !g_updatingUi)
+                {
+                    char buf[32] = {0};
+                    GetWindowTextA(hEditWalk, buf, sizeof(buf));
+                    for (int i = 0; buf[i]; i++) if (buf[i] == ',') buf[i] = '.';
+                    char *endPtr = NULL;
+                    double val = strtod(buf, &endPtr);
+                     if (endPtr != buf)
+                    {
+                        if (val < 0.34) val = 0.34;
+                        if (val > 1.0)  val = 1.0;
+                        g_cfg.walkSpeed = (float)val;
+                        g_updatingUi = true;
+                        SendMessageA(hSliderWalk, TBM_SETPOS, TRUE, (int)(g_cfg.walkSpeed * 100.0f + 0.5f));
+                        g_updatingUi = false;
+                    }
+                }
+                else if (code == EN_KILLFOCUS)
+                {
+                    g_updatingUi = true;
+                    char buf[32];
+                    snprintf(buf, sizeof(buf), "%.2f", g_cfg.walkSpeed);
+                    SetWindowTextA(hEditWalk, buf);
                     g_updatingUi = false;
                 }
                 return 0;
@@ -936,6 +1007,13 @@ static LRESULT CALLBACK GuiWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
                     InvalidateRect(hBtnKeyDown, NULL, FALSE);
                     break;
 
+                case IDC_BTN_KEY_WALK:
+                    CancelAllCaptures();
+                    g_captureShortcutIdx = 4;
+                    RefreshShortcutButtons();
+                    InvalidateRect(hBtnKeyWalk, NULL, FALSE);
+                    break;
+
                 case IDC_BTN_RESET:
                 {
                     CancelAllCaptures();
@@ -971,7 +1049,6 @@ static LRESULT CALLBACK GuiWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
         {
             if (wParam != TIMER_POLL) break;
 
-            // 1. Escuchar botones extra del mouse durante captura (M3 / M4 / M5)
             if (g_guiOpen && g_capturingMouseBtn)
             {
                 if (GetAsyncKeyState(VK_MBUTTON) & 0x8000)
@@ -989,7 +1066,6 @@ static LRESULT CALLBACK GuiWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
                 return 0;
             }
 
-            // 2. Escuchar atajo global para abrir/cerrar la ventana GUI
             static ULONGLONG lastMenuToggleTick = 0;
             ULONGLONG now = GetTickCount64();
 
@@ -1000,7 +1076,7 @@ static LRESULT CALLBACK GuiWndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lP
                 if (fg) GetWindowThreadProcessId(fg, &pid);
 
                 HWND focusCtrl = g_guiOpen ? GetFocus() : NULL;
-                bool editingText = (focusCtrl == hEditX || focusCtrl == hEditY);
+                bool editingText = (focusCtrl == hEditX || focusCtrl == hEditY || focusCtrl == hEditWalk);
 
                 if (pid == GetCurrentProcessId() && !editingText && IsShortcutHeldNow(g_cfg.keyOpenMenu))
                 {
@@ -1044,6 +1120,7 @@ static void CommitCapturedShortcut(int vk)
         case 1: g_cfg.keyToggleMod = sc; break;
         case 2: g_cfg.keySensUp    = sc; break;
         case 3: g_cfg.keySensDown  = sc; break;
+        case 4: g_cfg.keyWalk      = sc; break;
     }
 
     g_captureShortcutIdx = -1;
@@ -1084,7 +1161,7 @@ static DWORD WINAPI GuiThreadProc(LPVOID lpParam)
 
     DWORD style   = WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU;
     DWORD exStyle = WS_EX_TOPMOST;
-    RECT rc = { 0, 0, 454, 594 };
+    RECT rc = { 0, 0, 454, 624 };
     AdjustWindowRectEx(&rc, style, FALSE, exStyle);
 
     int winW = rc.right - rc.left;
